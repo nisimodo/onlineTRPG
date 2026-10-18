@@ -1,0 +1,104 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#151a2e">
+  <title>AI卓 ― 物語の酒場</title>
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🎲</text></svg>">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Shippori+Mincho:wght@500;700;800&family=Zen+Kaku+Gothic+New:wght@400;500;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <!-- 合言葉 -->
+  <section id="screen-gate" class="screen">
+    <div class="gate-card parchment">
+      <div class="crest">🎲</div>
+      <h1 class="title">物語の酒場</h1>
+      <p class="subtitle">AIゲームマスターと遊ぶ TRPG</p>
+      <form id="gate-form" class="stack">
+        <label class="field">
+          <span>合言葉</span>
+          <input id="gate-pass" type="password" autocomplete="current-password" required placeholder="仲間から聞いた合言葉">
+        </label>
+        <button class="btn btn-gold" type="submit">扉を開ける</button>
+        <p id="gate-error" class="error" hidden></p>
+      </form>
+    </div>
+  </section>
+
+  <!-- ロビー -->
+  <section id="screen-lobby" class="screen" hidden>
+    <header class="lobby-head">
+      <h1 class="title small">物語の酒場</h1>
+      <button id="logout" class="btn btn-ghost btn-sm" type="button">合言葉を入れ直す</button>
+    </header>
+    <div class="lobby-body">
+      <section class="parchment panel">
+        <div class="panel-head">
+          <h2>開いている卓</h2>
+          <button id="rooms-refresh" class="btn btn-ghost btn-sm" type="button">↻ 更新</button>
+        </div>
+        <div id="room-list" class="room-list"></div>
+      </section>
+      <section class="parchment panel">
+        <h2>新しい卓を立てる</h2>
+        <form id="create-form" class="stack">
+          <label class="field"><span>卓の名前</span><input id="create-name" maxlength="30" required placeholder="例：金曜の夜の冒険"></label>
+          <label class="field"><span>卓の合言葉（参加者に伝えてください）</span><input id="create-pass" maxlength="50" required placeholder="例：たまご"></label>
+          <div class="field"><span>シナリオ</span><div id="scenario-list" class="scenario-list"></div></div>
+          <button class="btn btn-gold" type="submit">卓を立てる</button>
+          <p id="create-error" class="error" hidden></p>
+        </form>
+      </section>
+    </div>
+  </section>
+
+  <!-- ゲーム -->
+  <section id="screen-game" class="screen" hidden>
+    <header class="game-head">
+      <div class="game-title">
+        <div id="g-room" class="g-room"></div>
+        <div class="g-sub"><span id="g-scenario"></span><span id="g-scene" class="g-scene"></span></div>
+      </div>
+      <div class="game-actions">
+        <span id="g-phase" class="phase-badge"></span>
+        <button id="g-menu" class="btn btn-ghost btn-sm" type="button" aria-label="メニュー">☰</button>
+      </div>
+    </header>
+    <div id="reconnect-bar" class="reconnect-bar" hidden>接続が切れました。再接続しています…</div>
+    <div id="game-body" class="game-body" data-tab="story">
+      <main class="pane pane-story">
+        <div id="charselect" class="charselect" hidden></div>
+        <div id="log" class="log" aria-live="polite"></div>
+        <div id="controls" class="controls"></div>
+      </main>
+      <aside class="pane pane-side">
+        <section id="sec-party" class="side-sec parchment" data-sec="party"></section>
+        <section id="sec-sheet" class="side-sec parchment" data-sec="sheet"></section>
+        <section id="sec-dice" class="side-sec parchment" data-sec="dice"></section>
+      </aside>
+    </div>
+    <nav class="tabs" id="tabs">
+      <button data-tab="story" class="active" type="button"><span>📜</span>物語</button>
+      <button data-tab="sheet" type="button"><span>🧙</span>キャラ</button>
+      <button data-tab="party" type="button"><span>👥</span>仲間</button>
+      <button data-tab="dice" type="button"><span>🎲</span>ダイス</button>
+    </nav>
+  </section>
+
+  <div id="modal" class="modal" hidden>
+    <div class="modal-back" data-close></div>
+    <div class="modal-card parchment" role="dialog" aria-modal="true">
+      <button class="modal-x" type="button" data-close aria-label="閉じる">×</button>
+      <div id="modal-content"></div>
+    </div>
+  </div>
+  <div id="toast" class="toast" hidden></div>
+
+  <script src="config.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>
