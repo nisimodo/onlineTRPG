@@ -520,6 +520,7 @@
     $('#charselect').hidden = !needChar;
     $('#log').hidden = needChar && r.phase === 'lobby';
     if (needChar) renderCharSelect();
+    renderEnemies();
     renderControls();
     renderParty();
     renderSheet();
@@ -640,6 +641,24 @@
     );
   }
 
+  // 場にいる敵
+  function renderEnemies() {
+    const r = S.room;
+    const box = $('#enemies');
+    const list = r.phase === 'lobby' ? [] : r.enemies || [];
+    box.hidden = list.length === 0;
+    box.replaceChildren(
+      ...list.map((e) =>
+        el(
+          'div',
+          { class: 'enemy' },
+          el('div', { class: 'enemy-top' }, el('span', { class: 'enemy-name', text: '⚔ ' + e.name }), el('span', { class: 'enemy-hp', text: `HP ${e.hp} / ${e.maxHp}` })),
+          el('div', { class: 'bar enemy-bar' }, el('i', { style: `width:${Math.max(0, Math.min(100, (e.hp / e.maxHp) * 100))}%` }))
+        )
+      )
+    );
+  }
+
   // 操作エリア
   // 入力欄は、作り直すとスマホのキーボードが閉じてしまうので、必要なときだけ作り直す
   const ctrl = { card: null, modeBox: null, inputSlot: null, infoSlot: null, inputKey: null };
@@ -716,7 +735,7 @@
         const owner = playerOf(q.pid);
         const mine = q.pid === S.you;
         const canProxy = isHost() && owner && !owner.connected;
-        const target = q.target != null ? (q.mode === 'le' ? `目標 ${q.target} 以下` : q.mode === 'ge' ? `目標 ${q.target} 以上` : q.mode === 'count' ? `${q.target}以上の数` : '') : '';
+        const target = q.target != null ? (q.mode === 'le' ? `目標 ${q.target} 以下` : q.mode === 'ge' ? `目標 ${q.target} 以上` : q.mode === 'count' ? `${q.target}以上の数` : '') : q.mode === 'none' ? '（ダメージなどの値を決めるロール）' : '';
         card.append(
           el(
             'div',
@@ -801,7 +820,21 @@
     );
   }
 
+  const DEGREE = {
+    critical: ['クリティカル', 'crit'],
+    great: ['大成功', 'great'],
+    success: ['成功', 'ok'],
+    marginal: ['ギリギリ成功', 'meh'],
+    near: ['惜しくも失敗', 'near'],
+    failure: ['失敗', 'ng'],
+    fumble: ['ファンブル', 'fum'],
+  };
+
   function resultBadge(r) {
+    if (r.degree && DEGREE[r.degree]) {
+      const [label, cls] = DEGREE[r.degree];
+      return el('span', { class: 'res ' + cls, text: r.mode === 'count' ? label + ' ×' + r.successes : label });
+    }
     if (r.critical) return el('span', { class: 'res crit', text: 'クリティカル' });
     if (r.fumble) return el('span', { class: 'res fum', text: 'ファンブル' });
     if (r.success === true) return el('span', { class: 'res ok', text: r.mode === 'count' ? `成功 ×${r.successes}` : '成功' });
@@ -989,11 +1022,13 @@
               r.rolls.map((v) => el('span', { class: 'die' + hit(v), text: v })),
               r.mode !== 'count' ? el('span', { class: 'roll-total', text: `= ${r.total}` }) : null,
               r.target != null ? el('span', { style: 'font-size:.75rem;opacity:.8', text: r.mode === 'le' ? `（${r.target}以下）` : r.mode === 'ge' ? `（${r.target}以上）` : `（${r.target}以上を数える）` }) : null,
-              r.success != null ? resultBadge(r) : null
+              r.success != null ? resultBadge(r) : r.mode === 'none' && !e.free ? el('span', { class: 'res dmg', text: '値ロール' }) : null
             )
           )
         );
       }
+      case 'enemy':
+        return el('div', { class: 'entry enemy-log ' + (e.event || ''), text: e.text });
       case 'death':
         return el('div', { class: 'entry death' }, iconBadge(e.icon), el('div', { text: '💀 ' + e.text }));
       case 'status':
