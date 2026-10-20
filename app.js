@@ -3,7 +3,8 @@
 
   const CFG = window.TRPG_CONFIG || {};
   const isLocal = ['localhost', '127.0.0.1'].includes(location.hostname) || location.protocol === 'file:';
-  const API = (CFG.WORKER_URL || (isLocal ? 'http://127.0.0.1:8787' : '')).replace(/\/$/, '');
+  // 手元（localhost）で開いたときは手元のサーバーにつなぐ
+  const API = (isLocal ? 'http://127.0.0.1:8787' : CFG.WORKER_URL || '').replace(/\/$/, '');
   const WS_URL = API.replace(/^http/, 'ws') + '/api/ws';
 
   const ICONS = ['⚔️', '🛡️', '🏹', '🔮', '🐉', '🦉', '🌙', '⭐', '🔥', '🍀'];
@@ -497,7 +498,7 @@
   function myTurnNeeded() {
     const r = S.room;
     const m = me();
-    if (!r || !m || !m.sheet) return false;
+    if (!r || !m || !m.sheet || m.dead) return false;
     if (r.phase === 'actions') return !m.acted;
     if (r.phase === 'rolls') return r.pendingRolls.some((q) => q.pid === S.you && !q.result);
     return false;
@@ -511,7 +512,7 @@
     $('#g-scene').textContent = r.scene;
     const badge = $('#g-phase');
     const mine = myTurnNeeded();
-    badge.textContent = mine ? (r.phase === 'rolls' ? 'あなたの判定！' : 'あなたの番') : PHASE_LABEL[r.phase] || r.phase;
+    badge.textContent = me()?.dead && r.phase !== 'ended' ? '💀 観戦中' : mine ? (r.phase === 'rolls' ? 'あなたの判定！' : 'あなたの番') : PHASE_LABEL[r.phase] || r.phase;
     badge.classList.toggle('me', mine);
     document.title = (mine ? '【あなたの番】' : '') + r.name + ' ― 物語の酒場';
 
@@ -660,15 +661,23 @@
       ctrl.card = el('div', { class: 'ctrl-card parchment' }, ctrl.modeBox, ctrl.inputSlot, ctrl.infoSlot);
       box.replaceChildren(ctrl.card);
     }
+    if (m.dead) S.inputMode = 'chat';
     ctrl.modeBox.replaceChildren(
-      el('button', { type: 'button', class: S.inputMode === 'action' ? 'on' : '', text: '行動', onclick: () => setMode('action') }),
-      el('button', { type: 'button', class: S.inputMode === 'chat' ? 'on' : '', text: '雑談', onclick: () => setMode('chat') })
+      ...(m.dead
+        ? [el('button', { type: 'button', class: 'on', text: '雑談のみ' })]
+        : [
+            el('button', { type: 'button', class: S.inputMode === 'action' ? 'on' : '', text: '行動', onclick: () => setMode('action') }),
+            el('button', { type: 'button', class: S.inputMode === 'chat' ? 'on' : '', text: '雑談', onclick: () => setMode('chat') }),
+          ])
     );
 
-    const inputKey = `${S.inputMode}|${S.inputMode === 'chat' ? '' : r.phase}|${m.acted}`;
+    const inputKey = `${S.inputMode}|${S.inputMode === 'chat' ? '' : r.phase}|${m.acted}|${m.dead}`;
     if (inputKey !== ctrl.inputKey) {
       ctrl.inputKey = inputKey;
       const parts = [];
+      if (m.dead) {
+        parts.push(el('div', { class: 'dead-note', text: `💀 ${m.sheet.name} は${m.sheet.condition === '死亡' ? '力尽きました' : '物語から退場しました'}。ここからは観戦と雑談だけできます。` }));
+      }
       if (S.inputMode === 'chat') {
         parts.push(inputRow('仲間と相談・雑談（GMには届きません）', '送る', (text) => sendOrWarn({ type: 'chat', text })));
       } else if (r.phase === 'actions') {
@@ -688,9 +697,9 @@
 
     const card = el('div');
     if (S.inputMode === 'chat') {
-      card.append(el('p', { class: 'muted', style: 'margin:6px 0 0', text: `いま：${PHASE_LABEL[r.phase] || r.phase}（「行動」に切り替えて進行できます）` }));
+      card.append(el('p', { class: 'muted', style: 'margin:6px 0 0', text: m.dead ? `いま：${PHASE_LABEL[r.phase] || r.phase}` : `いま：${PHASE_LABEL[r.phase] || r.phase}（「行動」に切り替えて進行できます）` }));
     } else if (r.phase === 'actions') {
-      card.append(waitLine(r.players.filter((p) => p.sheet), (p) => p.acted));
+      card.append(waitLine(r.players.filter((p) => p.sheet && !p.dead), (p) => p.acted));
       if (isHost()) {
         card.append(
           el('div', { style: 'margin-top:8px' }, el('button', {
@@ -813,7 +822,7 @@
           const hp = p.sheet?.resources[0];
           return el(
             'button',
-            { class: 'party-item', type: 'button', onclick: () => p.sheet && showPlayerSheet(p) },
+            { class: 'party-item' + (p.dead ? ' dead' : ''), type: 'button', onclick: () => p.sheet && showPlayerSheet(p) },
             iconBadge(p.icon),
             el(
               'div',
@@ -822,7 +831,7 @@
               el('div', { class: 'pi-char', text: p.sheet ? `${p.sheet.name}（${p.sheet.role}）${p.sheet.condition && p.sheet.condition !== '良好' ? '／' + p.sheet.condition : ''}` : 'キャラ未選択' }),
               hp ? el('div', { class: 'bar', title: `${hp.name} ${hp.value}/${hp.max}` }, el('i', { style: `width:${Math.max(0, Math.min(100, (hp.value / hp.max) * 100))}%` })) : null
             ),
-            r.phase === 'actions' && p.sheet ? el('span', { text: p.acted ? '✓' : '…', title: p.acted ? '宣言済み' : '考え中' }) : null
+            p.dead ? el('span', { text: '💀', title: '退場' }) : r.phase === 'actions' && p.sheet ? el('span', { text: p.acted ? '✓' : '…', title: p.acted ? '宣言済み' : '考え中' }) : null
           );
         })
       )
@@ -834,6 +843,7 @@
     return [
       el('div', { class: 'sheet-head' }, player ? iconBadge(player.icon) : null, el('div', null, el('div', { class: 'sheet-name', text: sheet.name }), el('div', { class: 'sheet-role', text: sheet.role }))),
       ch ? el('p', { class: 'sheet-desc', text: ch.desc }) : null,
+      player?.dead ? el('div', { class: 'dead-note', text: '💀 このキャラクターは退場しました' }) : null,
       el('div', { class: 'cond' }, '状態：', el('b', { text: sheet.condition || '良好' })),
       el(
         'div',
@@ -849,7 +859,7 @@
       ),
       el('h3', { text: '技能' }),
       skillGrid(sheet.skills),
-    ];
+    ].filter(Boolean);
   }
 
   function showPlayerSheet(p) {
@@ -872,6 +882,7 @@
     const sec = $('#sec-dice');
     if (sec.dataset.built) {
       $('#dice-hint').textContent = S.scenario ? `このシナリオ：${S.scenario.diceLabel}` : '';
+      $('#free-roll').disabled = !!me()?.dead;
       return;
     }
     sec.dataset.built = '1';
@@ -908,11 +919,12 @@
       el('div', { class: 'row', style: 'justify-content:space-between;margin-top:6px' }, el('span', { text: '修正値' }), el('div', { class: 'stepper' }, step(modInput, -1), modInput, step(modInput, 1))),
       el('div', { style: 'margin-top:8px' }, labelInput),
       preview,
-      el('button', { class: 'btn btn-gold btn-block', type: 'button', text: '自由にダイスを振る', onclick: roll }),
+      el('button', { class: 'btn btn-gold btn-block', type: 'button', id: 'free-roll', text: '自由にダイスを振る', onclick: roll }),
       el('div', { class: 'dice-presets' }, preset(1, 100), preset(1, 10), preset(2, 6), preset(3, 6), preset(1, 6)),
       el('p', { class: 'muted', style: 'margin-top:10px', text: 'GMから判定を求められたときは、物語画面のボタンから振ってください。' })
     );
     update();
+    $('#free-roll').disabled = !!me()?.dead;
     $('#dice-hint').textContent = S.scenario ? `このシナリオ：${S.scenario.diceLabel}` : '';
   }
 
@@ -982,6 +994,8 @@
           )
         );
       }
+      case 'death':
+        return el('div', { class: 'entry death' }, iconBadge(e.icon), el('div', { text: '💀 ' + e.text }));
       case 'status':
         return el('div', { class: 'entry status', text: '📜 ' + e.text });
       case 'system':

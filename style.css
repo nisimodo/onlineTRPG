@@ -319,3 +319,9 @@ input:focus, textarea:focus, select:focus { outline: 2px solid var(--gold); outl
 .menu-list { display: flex; flex-direction: column; gap: 10px; }
 .toast { position: fixed; left: 50%; bottom: calc(var(--tabs-h) + 20px); transform: translateX(-50%); background: #2b2235; color: var(--parch); border: 1px solid var(--gold); padding: 10px 18px; border-radius: 999px; z-index: 60; box-shadow: var(--shadow); max-width: calc(100% - 32px); font-size: 0.9rem; }
 .rules-text { white-space: pre-wrap; font-size: 0.9rem; line-height: 1.7; }
+
+/* 退場（死亡）したキャラクター */
+.dead-note { background: #2b1d1d; color: #f3c8c0; border: 1px solid #6e1d17; border-radius: 10px; padding: 8px 12px; font-weight: 700; font-size: 0.88rem; margin-bottom: 8px; }
+.party-item.dead { opacity: 0.55; filter: grayscale(0.8); }
+.entry.death { display: flex; gap: 10px; align-items: center; background: #2b1d1d; color: #f3c8c0; border: 1px solid #6e1d17; border-radius: 10px; padding: 10px 12px; font-family: var(--serif); font-weight: 700; }
+.entry.death .icon-badge { filter: grayscale(1); }
