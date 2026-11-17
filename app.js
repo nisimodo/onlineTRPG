@@ -6,6 +6,8 @@
   // 手元（localhost）で開いたときは手元のサーバーにつなぐ
   const API = (isLocal ? 'http://127.0.0.1:8787' : CFG.WORKER_URL || '').replace(/\/$/, '');
   const WS_URL = API.replace(/^http/, 'ws') + '/api/ws';
+  // デスクトップアプリで開いたときだけ存在する（ホストのPCの Ollama を使う窓口）
+  const DESK = window.trpgDesktop || null;
 
   const ICONS = ['⚔️', '🛡️', '🏹', '🔮', '🐉', '🦉', '🌙', '⭐', '🔥', '🍀'];
   const ICON_NAMES = ['剣', '盾', '弓', '水晶', '竜', '梟', '月', '星', '炎', '若葉'];
@@ -454,10 +456,16 @@
         show('game');
         renderAllLogs();
         renderGame();
+        S.localSent = null; // 新しい接続なので、ローカルAIの状態を送り直す
+        syncLocalAI();
         return;
       case 'state':
         S.room = msg.room;
         renderGame();
+        syncLocalAI();
+        return;
+      case 'gmRequest':
+        answerGM(msg);
         return;
       case 'log':
         S.logs.push(msg.entry);
@@ -474,6 +482,66 @@
         leaveToLobby('退室しました');
         return;
     }
+  }
+
+  // ---------- デスクトップ版：ローカルAI ----------
+  S.desk = { state: 'none' };
+
+  // ホストで、ローカルAIの準備ができていれば「使えます」とサーバーに伝える
+  function syncLocalAI() {
+    if (!DESK || !S.welcomed) return;
+    const on = isHost() && S.desk.state === 'ready';
+    const key = on ? 'on:' + S.desk.model : 'off';
+    if (S.localSent === key) return;
+    if (send({ type: 'localAI', on, model: S.desk.model || '' })) S.localSent = key;
+  }
+
+  async function answerGM(msg) {
+    if (!DESK) return send({ type: 'gmResponse', id: msg.id, ok: false, error: 'デスクトップ版ではありません' });
+    try {
+      const text = await DESK.generate({ system: msg.system, user: msg.user, schema: msg.schema });
+      send({ type: 'gmResponse', id: msg.id, ok: true, text });
+    } catch (e) {
+      send({ type: 'gmResponse', id: msg.id, ok: false, error: String(e?.message || e).replace(/^Error invoking remote method '[^']+': (Error: )?/, '') });
+    }
+  }
+
+  function renderDesk() {
+    const panel = $('#desk-panel');
+    if (!panel || !DESK) return;
+    const d = S.desk;
+    panel.hidden = false;
+    panel.textContent = '';
+    const msgs = {
+      starting: 'ローカルAI（Ollama）を起動しています…',
+      noOllama: 'Ollama が見つかりません。インストールしてから、このアプリを起動し直してください。',
+      needModel: `AIモデル（${d.model}、約${d.size || '5GB'}）がまだありません。最初に一度だけダウンロードが必要です。`,
+      pulling: `AIモデルをダウンロード中…${d.progress != null ? Math.floor(d.progress * 100) + '%' : ''}`,
+      ready: `準備OK（${d.model}）。この画面で卓を立てる（ホストになる）と、GMはこのPCのAIが無制限で担当します。`,
+      error: 'ローカルAIでエラー：' + (d.message || '不明'),
+    };
+    panel.append(
+      el('h2', { text: '🖥️ デスクトップ版' }),
+      el('div', { class: 'desk-msg', text: msgs[d.state] || '確認中…' })
+    );
+    if (d.state === 'pulling' && d.progress != null) panel.append(el('progress', { max: 1, value: d.progress }));
+    if (d.state === 'noOllama') panel.append(el('a', { class: 'btn btn-gold btn-sm', href: 'https://ollama.com/download', target: '_blank', rel: 'noopener', text: 'Ollama を入手' }));
+    if (d.state === 'needModel' || d.state === 'error') {
+      panel.append(el('button', { class: 'btn btn-gold btn-sm', type: 'button', text: d.state === 'error' ? 'もう一度試す' : 'ダウンロードする', onclick: () => DESK.pull() }));
+    }
+  }
+
+  if (DESK) {
+    DESK.onStatus((st) => {
+      S.desk = st || { state: 'none' };
+      renderDesk();
+      syncLocalAI();
+    });
+    DESK.status().then((st) => {
+      S.desk = st || { state: 'none' };
+      renderDesk();
+      syncLocalAI();
+    });
   }
 
   document.addEventListener('visibilitychange', () => {
@@ -511,6 +579,10 @@
     $('#g-scenario').textContent = r.scenarioTitle;
     $('#g-scene').textContent = r.scene;
     $('#g-progress').textContent = r.progress && r.progress.total ? '📖 進行 ' + r.progress.done + '/' + r.progress.total : '';
+    const ai = $('#g-ai');
+    ai.textContent = r.ai?.kind === 'local' ? '🖥️ ローカルAI' : '☁️ Gemini';
+    ai.title = r.ai?.kind === 'local' ? 'ホストのPCのAI（' + r.ai.model + '）がGMを担当中' : 'Gemini がGMを担当中';
+    ai.classList.toggle('local', r.ai?.kind === 'local');
     const badge = $('#g-phase');
     const mine = myTurnNeeded();
     badge.textContent = me()?.dead && r.phase !== 'ended' ? '💀 観戦中' : mine ? (r.phase === 'rolls' ? 'あなたの判定！' : 'あなたの番') : PHASE_LABEL[r.phase] || r.phase;
@@ -761,7 +833,7 @@
         card.append(el('button', { class: 'btn btn-ghost btn-sm', type: 'button', text: '⏩ 残りを自動で振る（ホスト）', onclick: () => sendOrWarn({ type: 'force' }) }));
       }
     } else if (r.phase === 'gm') {
-      card.append(el('div', { class: 'thinking' }, el('span', { class: 'quill', text: '🪶' }), 'GMが物語を紡いでいます…'));
+      card.append(el('div', { class: 'thinking' }, el('span', { class: 'quill', text: '🪶' }), r.ai?.kind === 'local' ? 'GMが物語を紡いでいます…（ホストのPCで考え中。1分ほどかかることがあります）' : 'GMが物語を紡いでいます…'));
       if (isHost()) {
         card.append(el('div', { style: 'margin-top:8px' }, el('button', { class: 'btn btn-ghost btn-sm', type: 'button', text: '応答が来ない時：中断する', onclick: () => confirm('GMの応答を中断して、再試行できる状態にしますか？') && sendOrWarn({ type: 'force' }) })));
       }
