@@ -491,9 +491,9 @@
   function syncLocalAI() {
     if (!DESK || !S.welcomed) return;
     const on = isHost() && S.desk.state === 'ready';
-    const key = on ? 'on:' + S.desk.model : 'off';
+    const key = on ? 'on:' + S.desk.model + ':' + (S.desk.ctx || 0) : 'off';
     if (S.localSent === key) return;
-    if (send({ type: 'localAI', on, model: S.desk.model || '' })) S.localSent = key;
+    if (send({ type: 'localAI', on, model: S.desk.model || '', ctx: S.desk.ctx || 0 })) S.localSent = key;
   }
 
   async function answerGM(msg) {
