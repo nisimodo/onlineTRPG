@@ -499,7 +499,7 @@
   async function answerGM(msg) {
     if (!DESK) return send({ type: 'gmResponse', id: msg.id, ok: false, error: 'デスクトップ版ではありません' });
     try {
-      const text = await DESK.generate({ system: msg.system, user: msg.user, schema: msg.schema });
+      const text = await DESK.generate({ system: msg.system, user: msg.user, schema: msg.schema, numCtx: msg.numCtx, timeoutMs: msg.timeoutMs });
       send({ type: 'gmResponse', id: msg.id, ok: true, text });
     } catch (e) {
       send({ type: 'gmResponse', id: msg.id, ok: false, error: String(e?.message || e).replace(/^Error invoking remote method '[^']+': (Error: )?/, '') });
