@@ -510,6 +510,7 @@
     $('#g-room').textContent = r.name;
     $('#g-scenario').textContent = r.scenarioTitle;
     $('#g-scene').textContent = r.scene;
+    $('#g-progress').textContent = r.progress && r.progress.total ? '📖 進行 ' + r.progress.done + '/' + r.progress.total : '';
     const badge = $('#g-phase');
     const mine = myTurnNeeded();
     badge.textContent = me()?.dead && r.phase !== 'ended' ? '💀 観戦中' : mine ? (r.phase === 'rolls' ? 'あなたの判定！' : 'あなたの番') : PHASE_LABEL[r.phase] || r.phase;
@@ -739,7 +740,7 @@
         card.append(
           el(
             'div',
-            { class: 'roll-req' + (mine && !q.result ? ' mine' : '') },
+            { class: 'roll-req' + (mine && !q.result ? ' mine' : '') + (q.attack ? ' defense' : '') },
             el(
               'div',
               { class: 'rq-text' },
@@ -1027,6 +1028,12 @@
           )
         );
       }
+      case 'enemyRoll': {
+        const r = e.result;
+        return el('div', { class: 'entry enemy-roll' }, el('span', { class: 'er-icon', text: '🗡' }), el('div', null, el('div', { text: e.text }), r ? el('div', { class: 'dice-row' }, el('span', { style: 'font-size:.75rem;opacity:.8;margin-right:4px', text: r.dice }), r.rolls.map((v) => el('span', { class: 'die enemy-die', text: v })), el('span', { class: 'roll-total', text: '= ' + r.total })) : null));
+      }
+      case 'milestone':
+        return el('div', { class: 'entry milestone', text: e.text });
       case 'enemy':
         return el('div', { class: 'entry enemy-log ' + (e.event || ''), text: e.text });
       case 'death':
