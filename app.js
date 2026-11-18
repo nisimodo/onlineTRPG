@@ -529,6 +529,16 @@
     if (d.state === 'needModel' || d.state === 'error') {
       panel.append(el('button', { class: 'btn btn-gold btn-sm', type: 'button', text: d.state === 'error' ? 'もう一度試す' : 'ダウンロードする', onclick: () => DESK.pull() }));
     }
+    // AIモデルを選ぶ（古いアプリには選択機能がないので出さない）
+    if (DESK.setModel && Array.isArray(d.models) && d.models.length && d.state !== 'pulling' && d.state !== 'starting') {
+      const sel = el('select', { class: 'desk-model', onchange: () => DESK.setModel(sel.value) });
+      for (const m of d.models) {
+        const opt = el('option', { value: m.id, text: `${m.label}${m.installed ? '' : `（未ダウンロード・${m.size}）`}` });
+        if (m.id === d.model) opt.selected = true;
+        sel.append(opt);
+      }
+      panel.append(el('label', { class: 'desk-model-row' }, [el('span', { text: 'AIモデル：' }), sel]));
+    }
   }
 
   if (DESK) {
